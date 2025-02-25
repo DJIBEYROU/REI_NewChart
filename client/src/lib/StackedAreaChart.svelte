@@ -1,6 +1,6 @@
 <script>
   import { onMount, afterUpdate } from 'svelte';
-  import { sum } from 'd3-array';
+  import { sum, max } from 'd3-array';
   import { scaleOrdinal, scaleLinear, scaleTime } from "d3-scale";
   import { area, stack } from "d3-shape";
   import AxisX from "./AxisX.svelte";
@@ -9,18 +9,13 @@
   import HoverEvents from "./HoverEvents.svelte";
   import Tooltip from "./Tooltip.svelte";
   import { fade } from "svelte/transition";
-  // import { tweened } from "svelte/store";
-  // import {cubicOut} from 'svelte/easing';
-  // import { interpolateString } from 'd3-interpolate';
+  import { renewables, non_renewables, colors } from './consts.js'
 
-  export let data, attribute
-  
-  const renewables = ['Wind onshore', 'Natural Gas', 'Biomass', 'Wind offshore', 'Nuclear', 'Solar', 'Run-of-River Hydro', 'Pumped storage generation', 'Other renewables', 'Dam Hydro', 'Geothermal']
-  const non_renewables = ['Lignite', 'Hard Coal', 'Other fossil fuel', 'Oil',  'Non-renewable waste']
+  export let data, aggregationLevel
   
   const colorScale = scaleOrdinal()
-    .domain(non_renewables.concat(renewables)) 
-    .range(['darkslategray', 'dimgray', 'lightgray', 'gold', 'magenta', 'blue', 'lawngreen', 'saddlebrown', 'aqua', 'purple', 'yellow', 'teal', 'darkorange', 'red', 'dodgerblue', 'pink'])
+    .domain(Object.keys(colors)) 
+    .range(Object.values(colors))
 
   const margin = { top: 40, right: 30, bottom: 30, left: 60 };
   let div
@@ -51,7 +46,24 @@
     }
   }
 
-  $: stackKeys = Object.keys(data[0]).filter(d => d !== 'date_id' && d !== 'region').sort()
+  function sortEnergyTypesByTotal(data) {
+    // Get all energy types (excluding date and region)
+    const energyTypes = Object.keys(data[0] || {}).filter(
+      key => key !== 'date' && key !== 'region'
+    );
+    
+    // Calculate total value for each energy type
+    const energyTotals = {};
+    energyTypes.forEach(energyType => {
+      energyTotals[energyType] = data.reduce((total, entry) => 
+        total + (entry[energyType] || 0), 0);
+    });
+    
+    // Sort energy types by total value (descending)
+    return energyTypes.sort((a, b) => energyTotals[b] - energyTotals[a]);
+  }
+
+  $: stackKeys = sortEnergyTypesByTotal(data);
 
   $: legendData = stackKeys.map(d => {
     return {
@@ -69,31 +81,114 @@
   $: legendData_nonrenewable = legendData.filter(d => non_renewables.indexOf(d.text) !== -1)
 
   $: yScale = scaleLinear()
-    .domain([0, attribute === 'value' ? 2000 : 1])  //in Gwh
-    .range([innerHeight, 0]);
+  .domain([
+    0, 
+    // Add 10% buffer to the maximum
+    max(data, d => 
+      stackKeys.reduce((sum, key) => sum + (d[key] || 0), 0)
+    ) * 1.1
+  ])
+  .range([innerHeight, 0]);
 
   $: xScale = scaleTime()
-    .domain([new Date(data[0]['date_id']), new Date(data[data.length-1]['date_id'])])
+    .domain([new Date(data[0]['date']), new Date(data[data.length-1]['date'])])
     .range([0, innerWidth]);
 
   $: stackedData = stack()
     .keys(stackKeysSorted)(data)
 
   $: areaFunc = area()
-    .x(d => xScale(new Date(d.data.date_id)))
+    .x(d => xScale(new Date(d.data.date)))
     .y0(d => yScale(d[0]))
     .y1(d => yScale(d[1]));
 
-  $: hoveredData = hoveredDate ? data.filter(d => d.date_id >= hoveredDate)[0] : null
+    $: hoveredData = hoveredDate ? findClosestDataPoint(data, hoveredDate, aggregationLevel) : null;
 
-  // let line = tweened(0, {
-	// 	duration: 400,
-	// 	easing: cubicOut,
-  //   interpolate: interpolateString
-	// });
+  // Add this function to your component
+  function findClosestDataPoint(data, hoveredTimestamp, aggregationLevel) {
+    if (!data.length) return null;
+    
+    return data.reduce((closest, current) => {
+      const currentDate = new Date(current.date);
+      const currentTimestamp = currentDate.getTime();
+      const closestDate = closest ? new Date(closest.date) : null;
+      const closestTimestamp = closestDate ? closestDate.getTime() : null;
+      
+      // First entry or exact match
+      if (!closest || currentTimestamp === hoveredTimestamp) {
+        return current;
+      }
+      
+      // For different aggregation levels, adjust how we determine "closest"
+      if (aggregationLevel === 'hourly') {
+        // For hourly data, simple timestamp difference is appropriate
+        if (Math.abs(currentTimestamp - hoveredTimestamp) < Math.abs(closestTimestamp - hoveredTimestamp)) {
+          return current;
+        }
+      } 
+      else if (aggregationLevel === 'daily') {
+        // For daily data, compare day boundaries
+        const hoveredDay = new Date(hoveredTimestamp).setHours(0, 0, 0, 0);
+        const currentDay = new Date(currentDate).setHours(0, 0, 0, 0);
+        const closestDay = new Date(closestDate).setHours(0, 0, 0, 0);
+        
+        if (Math.abs(currentDay - hoveredDay) < Math.abs(closestDay - hoveredDay)) {
+          return current;
+        }
+      }
+      else if (aggregationLevel === 'weekly') {
+        // For weekly data, find the closest week start
+        const hoveredWeekStart = getWeekStart(new Date(hoveredTimestamp));
+        const currentWeekStart = getWeekStart(currentDate);
+        const closestWeekStart = getWeekStart(closestDate);
+        
+        if (Math.abs(currentWeekStart.getTime() - hoveredWeekStart.getTime()) < 
+            Math.abs(closestWeekStart.getTime() - hoveredWeekStart.getTime())) {
+          return current;
+        }
+      }
+      else if (aggregationLevel === 'monthly') {
+        // For monthly data, compare month and year
+        const hoveredDate = new Date(hoveredTimestamp);
+        const hoveredMonth = hoveredDate.getMonth();
+        const hoveredYear = hoveredDate.getFullYear();
+        
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        
+        const closestMonth = closestDate.getMonth();
+        const closestYear = closestDate.getFullYear();
+        
+        // Calculate "distance" in months
+        const hoveredTotalMonths = (hoveredYear * 12) + hoveredMonth;
+        const currentTotalMonths = (currentYear * 12) + currentMonth;
+        const closestTotalMonths = (closestYear * 12) + closestMonth;
+        
+        if (Math.abs(currentTotalMonths - hoveredTotalMonths) < 
+            Math.abs(closestTotalMonths - hoveredTotalMonths)) {
+          return current;
+        }
+      }
+      
+      return closest;
+    }, null);
+  }
 
-  // $: tweenAreaFunc = (d) => line.set(areaFunc(d));
+  // Helper function to get the start of a week (Sunday)
+  function getWeekStart(date) {
+    const result = new Date(date);
+    const day = result.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    result.setDate(result.getDate() - day); // Go back to the previous Sunday
+    result.setHours(0, 0, 0, 0); // Reset time to start of day
+    return result;
+  }
 </script>
+
+<div style='height: 220px'>
+  <div><span style='font-size: 0.7em; margin-left: 20px;'>Click on a legend item to highlight the fuel source. Double-click on any item to un-highlight.</span></div>
+  <Legend legendData={legendData_renewable} title="Renewables" bind:clicked={clickedItem}/>
+  <Legend legendData={legendData_nonrenewable} title="Non-renewables" bind:clicked={clickedItem}/>
+</div>
 
 <div class="chart-container" bind:this={div}>
   <svg
@@ -103,8 +198,8 @@
     <g transform="translate({margin.left} {margin.top})">
       <AxisX
         height={innerHeight}
-        interval="Day"
-        ticks={xScale.ticks(20)}
+        width={innerWidth} 
+        interval={aggregationLevel}
         {xScale}
       />
       <AxisY
@@ -141,14 +236,11 @@
     <Tooltip data={hoveredData} x={xPos} {colorScale} {width} />
   {/if}
 </div>
-<div><span style='font-size: 0.7em; margin-left: 20px;'>Click on a legend item to highlight the fuel source. Double-click on any item to un-highlight.</span></div>
-<Legend legendData={legendData_renewable} title="Renewables" bind:clicked={clickedItem}/>
-<Legend legendData={legendData_nonrenewable} title="Non-renewables" bind:clicked={clickedItem}/>
 
 <style>
   .chart-container {
     position: relative;
     width: 100%;
-    height: 72%;
+    height: 67%;
   }
 </style>

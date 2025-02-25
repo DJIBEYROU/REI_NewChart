@@ -23,7 +23,7 @@
     let objEntries = Object.entries(data);
     objEntries.sort((a, b) => b[1] - a[1]);
     let sortedObj = Object.fromEntries(objEntries);
-    rows = Object.keys(sortedObj).filter(d => d !== 'date_id' && d !== 'region')
+    rows = Object.keys(sortedObj).filter(d => d !== 'date' && d !== 'region')
   }
 
 </script>
@@ -36,7 +36,7 @@
   bind:clientWidth={tooltipWidth}
 >
   <h1>
-    {`${new Date(data.date_id).toLocaleDateString('en-US', { day: '2-digit' })}/${new Date(data.date_id).toLocaleDateString('en-US', { month: '2-digit' })}/${new Date(data.date_id).toLocaleDateString('en-US', { year: '2-digit' })}`}
+    {data.date}
   </h1>
   {#each rows as row}
   <div class='info'>

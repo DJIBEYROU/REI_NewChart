@@ -1,6 +1,6 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { groups } from 'd3-array'
+  import { groups, max } from 'd3-array'
   import { scaleLinear, scaleTime } from 'd3-scale'
   import { line } from 'd3-shape'
   import AxisX from './AxisX.svelte'
@@ -8,16 +8,13 @@
 
   export let data
 
-  const margin = { top: 40, right: 30, bottom: 30, left: 60 };
+  const margin = { top: 40, right: 60, bottom: 30, left: 60 };
   let div
   let width = 200
   let height = 520
   let innerHeight = height - margin.top - margin.bottom
   let innerWidth = width - margin.left - margin.right
 
-  // data = [{date_id: 'oct', 'renewable': 100}, {date_id: 'oct', 'non-renewable': 10}, {date_id: 'dec', 'renewable': 100}, {date_id: 'dec', 'non-renewable': 10}]
-  // newData = {date_id: 'oct', type: 'renewable', value: 100}
-  
   onMount(() => {
     updateChartSize()
   })
@@ -35,30 +32,17 @@
     }
   }
 
-  $: newData = data.reduce((result, item) => {
-    // Extract the common properties from the item
-    const { date_id } = item;
-
-    // Check if the item has a 'renewable' property and add it to the result
-    if ('renewable' in item) {
-      result.push({ date_id, type: 'renewable', value: item.renewable });
-    }
-
-    // Check if the item has a 'non-renewable' property and add it to the result
-    if ('non-renewable' in item) {
-      result.push({ date_id, type: 'non-renewable', value: item['non-renewable'] });
-    }
-
-    return result;
-  }, []);
-
+  $: maxValue = data && data.length > 0 
+    ? max(data, d => d.value) * 1.1 
+    : 1000;
+  
   $: lineData = groups(
-    newData,
+    data,
     d => d.type
   )
 
   $: yScale = scaleLinear()
-      .domain([0, 50000])
+      .domain([0, maxValue])
       .range([innerHeight, 0]);
 
   $: xScale = scaleTime()
@@ -68,6 +52,8 @@
   $: lineGenerator = line()
     .x((d, i) => xScale(new Date(d.date_id)))
     .y((d) => yScale(d.value))
+
+  $: console.log(lineData)
 </script>
 
 <div class="chart-container" bind:this={div}>
@@ -75,9 +61,9 @@
     <g transform="translate({margin.left} {margin.top})">
       <AxisX
         height={innerHeight}
+        width={innerWidth} 
         {xScale}
-        interval="Month"
-        ticks={data.map((d) => d.date_id)}
+        interval="monthly"
       />
       <AxisY 
         width={innerWidth} 
@@ -93,22 +79,22 @@
           stroke-width="3" 
         />
         <circle
-          cx={xScale(d[1][0].date_id)}
+          cx={xScale(new Date(d[1][0].date_id))}
           cy={yScale(d[1][0].value)}
           r={5}
           fill="black"
         />
         <circle
-          cx={xScale(d[1][1].date_id)}
-          cy={yScale(d[1][1].value)}
+          cx={xScale(new Date(d[1][d[1].length - 1].date_id))}
+          cy={yScale(d[1][d[1].length - 1].value)}
           r={5}
           fill="black"
         />
         <text
-          x={xScale(d[1][1].date_id) - 20}
-          y={yScale(d[1][1].value) - 10}
+          x={xScale(new Date(d[1][0].date_id)) + 10}
+          y={yScale(d[1][0].value) - 10}
           fill="black"
-          text-anchor="end"
+          text-anchor="start"
         >
           {d[0]}
         </text>
@@ -120,6 +106,6 @@
 <style>
   .chart-container {
     width: 100%;
-    height: 72%;
+    height: 100%;
   }
 </style>

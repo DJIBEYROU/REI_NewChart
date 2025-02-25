@@ -2,75 +2,90 @@
   import { onMount } from 'svelte';
   import StackedAreaChart from './lib/StackedAreaChart.svelte';
   import LineChart from './lib/LineChart.svelte';
-  
-  let data = {}
+  import TimeSlider from './lib/TimeSlider.svelte';
+
   let dailyData = []
   let monthlyData = []
-  let options = []
-  let selectedOption = 'Germany'
-  let selectedAttr = 'value'
-
-  async function getData() {
+  let regions = ['japan', 'tokyo', 'hokkaido', 'tohuku', 'chubu', 'hokuriku', 'kansai', 'chugoku', 'shikoku', 'kyushu'];
+  let selectedRegion = 'japan';
+  let startDate = '2024-04-01';
+  let endDate = '2024-04-15';
+  let aggregationLevel = 'hourly'; // Default aggregation for full date range
+  let loading = false;
+  
+  // This will store the full date range for the slider
+  let fullDateRange = [];
+  let allDates = []; // Store all dates for reuse
+  
+  async function fetchData() {
+    loading = true;
     try {
-      const response = await fetch('/data', {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        region: selectedRegion,
+        aggregation: aggregationLevel,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
+      const response = await fetch(`http://localhost:3000/api/data?${params}`);
       const result = await response.json();
-
-      if (result) {
-        data = {
-          daily: JSON.parse(result.type.daily), 
-          monthly: JSON.parse(result.categorized.monthly), 
-          perc_daily: JSON.parse(result.type.perc_daily)
+      dailyData = JSON.parse(result.type.daily)
+      monthlyData = JSON.parse(result.categorized.monthly)
+      console.log(dailyData, monthlyData)
+      if (regions.length > 0 && !selectedRegion) {
+        selectedRegion = regions[0];
+      }
+      
+      // Set up the full date range for the slider
+      if (fullDateRange.length === 0) {
+        // Create a fixed date range regardless of the data
+        const minDate = new Date('2022-01-01');
+        const maxDate = new Date('2024-12-31');
+        
+        // Create an array of dates between min and max (e.g., monthly increments)
+        const tempDates = [];
+        let currentDate = new Date(minDate);
+        
+        while (currentDate <= maxDate) {
+          tempDates.push(new Date(currentDate));
+          currentDate.setMonth(currentDate.getMonth() + 1);
         }
-        options = [...new Set(data.monthly.map(d => d['region']))]
-
-        // filter data by default country 
-        dailyData = data.daily.filter(d => d['region'] === selectedOption)
-        monthlyData = data.monthly.filter(d => d['region'] === selectedOption)
-        monthlyData = [monthlyData[0], monthlyData[monthlyData.length-1]]
-
-      } else {
-        throw new Error('Invalid response format');
+        
+        fullDateRange = tempDates;
+      }
+      
+      // Still store actual data dates separately if needed
+      if (dailyData.length > 0) {
+        allDates = dailyData.map(d => new Date(d.date));
+        allDates.sort((a, b) => a - b);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+    } finally {
+      loading = false;
     }
   }
 
-  onMount(async() => {
-    await getData();
-  })
+  onMount(fetchData);
+
+  $: {
+    // Refetch when these values change
+    if (selectedRegion || startDate || endDate) {
+      fetchData();
+    }
+  }
 
   function handleOptionChange(event) {
-    selectedOption = event.target.value;
-    
-    // filter data by selected country from dropdown menu
-    if(selectedAttr === 'perc'){
-      dailyData = data.perc_daily.filter(d => d['region'] === selectedOption)
-    } else if(selectedAttr === 'value'){
-      dailyData = data.daily.filter(d => d['region'] === selectedOption)
-    }
-    monthlyData = data.monthly.filter(d => d['region'] === selectedOption)
-    monthlyData = [monthlyData[0], monthlyData[monthlyData.length-1]]
+    selectedRegion = event.target.value;
   }
-
-  function handleTabClick(value){
-    selectedAttr = value;
-    if(selectedAttr === 'perc'){
-      dailyData = data.perc_daily.filter(d => d['region'] === selectedOption)
-    } else if(selectedAttr === 'value'){
-      dailyData = data.daily.filter(d => d['region'] === selectedOption)
-    }
+  
+  function handleDateRangeChange(event) {
+    const { startDate: newStartDate, endDate: newEndDate, aggregationLevel: newAggregationLevel } = event.detail;
+    startDate = newStartDate;
+    endDate = newEndDate;
+    aggregationLevel = newAggregationLevel;
+    console.log(`Date range changed: ${startDate} to ${endDate} with aggregation: ${aggregationLevel}`);
+    // The reactive statement above will trigger a data fetch
   }
 </script>
 
@@ -78,50 +93,47 @@
   {#if monthlyData.length > 0}
   <div class='header'>
     <div class='title' style="margin-left: 20px;">
-      <h2>Power generation for different fuel sources from October to December 2022</h2>
     </div>
     <div class='panel'>
       <div class='dropdown'>
-        <select value={selectedOption} on:change={handleOptionChange}>
-          {#each options as option}
+        <select value={selectedRegion} on:change={handleOptionChange}>
+          {#each regions as option}
           <option value={option}>{option}</option>
           {/each}
         </select>
         <span class="caret"></span>
-      </div>
-      <div class="buttons">
-        <h3 style="margin-top: 30px; width: 68px;">Show as: </h3>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div
-          class={selectedAttr === 'value' ? 'active' : ''}
-          on:click={() => handleTabClick('value')}
-        >
-          <h3>Absolute values</h3>
-        </div>
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div
-          class={selectedAttr === 'perc' ? 'active' : ''}
-          on:click={() => handleTabClick('perc')}
-        >
-          <h3>% of the total generation</h3>
-        </div>
       </div>
     </div>
   </div>
   <div class="wrapper">
     <div class='left'>
       {#if dailyData.length > 0}
-        <StackedAreaChart data={dailyData} attribute={selectedAttr}/>
-      {/if}
+        <StackedAreaChart data={dailyData} aggregationLevel={aggregationLevel} />
+        {:else}
+          <div>Loading...</div>
+        {/if}
     </div>
     <div class='right'>
       {#if monthlyData.length > 0}
         <LineChart data={monthlyData} />
+      {:else}
+        <div>Loading...</div>
       {/if}
     </div>
   </div>
+  
+  <!-- Time Slider Component -->
+  <div class="timeslider-wrapper">
+    {#if fullDateRange.length > 0}
+      <TimeSlider 
+        fullDateRange={fullDateRange}
+        {startDate}
+        {endDate}
+        on:dateRangeChange={handleDateRangeChange}
+      />
+    {/if}
+  </div>
+  
   {:else}
   <div class="wrapper">Loading...</div>
   {/if}
@@ -141,7 +153,7 @@
     display: flex;
     justify-content: space-between;
     width: 80%;
-    height: 100px;
+    height: 50px;
   }
 
   .panel { 
@@ -150,17 +162,23 @@
 
   .wrapper {
     display: flex;
-    width: 80%;
-    height: 80vh;
+    width: 90%;
+    height: 75vh; /* Reduced to make room for slider */
+  }
+  
+  .timeslider-wrapper {
+    width: 90%;
+    margin-top: 20px;
+    height: 100px;
   }
 
   .left {
-    width: 80%;
+    width: 75%;
     height: 100%;
   }
 
   .right {
-    width: 20%;
+    width: 25%;
     height: 100%;
   }
 
@@ -210,8 +228,7 @@
     color: black;
     border: 2px solid black;
     border-radius: 10px;
-    margin: 10px 20px;
-    height: 46px;
+    height: 26px;
   } 
   
   .dropdown select {
@@ -242,4 +259,3 @@
     margin-left: 8px
   }
 </style>
-

@@ -1,98 +1,233 @@
 import os
-from flask import Flask, send_from_directory, request
-from flask_cors import CORS
-from dotenv import load_dotenv
-import requests
 import json
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from datetime import datetime
 import pandas as pd
-import numpy as np
-
-load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-API_KEY = os.environ.get('API_KEY')
-
-def fix_outliers_missing_values(df):
-  outliers = []
-  for col in df:
+def parse_energy_json(file_path):
+    """
+    Parse JSON file with energy data where:
+    - 'epochs' is a list of timestamps
+    - Each region (like 'japan') contains energy sources as keys
+    - Each energy source (like 'nuclear') contains a list of values matching epochs
+    """
     try:
-      if(len(df[col].unique()) > len(df[col])/2):
-        # Outliers are deemed to be outside the 10th and 90th percentile
-        Q1 = np.percentile(df[col], 10, method='midpoint')
-        Q3 = np.percentile(df[col], 90, method='midpoint')
-        IQR = Q3 - Q1
-        lower = Q1 - 1.5*IQR
-        upper = Q3 + 1.5*IQR
-        # Find the outliers based on index in dataframe
-        upper_array = np.where(df[col]>=upper)[0] 
-        lower_array = np.where(df[col]<=lower)[0]
-        outliers.extend(upper_array)
-        outliers.extend(lower_array)
-    except:
-      continue
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        
+        # Initialize list to store transformed data
+        transformed_data = []
+        
+        # Get epochs array and regions
+        epochs = data.get('epochs', [])
+        regions = [key for key in data.keys() if key != 'epochs']
+        
+        # For each timestamp in epochs
+        for idx, epoch in enumerate(epochs):
+            for region in regions:
+                region_data = data[region]  # This is a dictionary like {nuclear: [values], thermal: [values]}
+                
+                # Check if region_data is actually a dictionary
+                if not isinstance(region_data, dict):
+                    #print(f"Warning: data['{region}'] is not a dictionary, skipping")
+                    continue
+            
+                # Create base entry for this timestamp and region
+                entry = {
+                    'date': datetime.fromtimestamp(epoch).strftime('%Y-%m-%d %H:%M:%S'),
+                    'region': region
+                }
+                
+                # Define energy types to exclude
+                excluded_energy_types = ['regional_in', 'regional_out', 'spot_price', 'demand', 'solar_curtailment', 'wind_curtailment']
 
-  # Removing the outliers
-  #print(outliers)
-  df_copy = df.copy()
-  df_copy.drop(index=outliers, inplace=True)
-  
-  # Replace all missing values with 0 (countries are missing large chunks of values for certain fuel sources only, suggesting that the country does not utilize these as fuel sources)
-  #print(df.isnull().sum())
-  df_copy = df_copy.fillna(0)
-
-  return df_copy
-  
-def aggregate_by(df):
-  # Convert 'date_id' column to datetime type and as index before resampling
-  df['date_id'] = pd.to_datetime(df['date_id'])
-  df.set_index('date_id', inplace=True)
-
-  # Resample the dataFrame for each 'region' separately
-  agg_hourly_dfs = {}
-  agg_daily_dfs = {}
-  agg_monthly_dfs = {}
-  agg_hourly_percs_dfs = {}
-  agg_daily_percs_dfs = {}
-  agg_monthly_percs_dfs = {}
-
-  for region, group_df in df.groupby('region'):
-      agg_daily_df = group_df.resample('D').sum().reset_index()  # Resample by month and calculate the sum
-      agg_daily_df['region'] = region
-      agg_daily_dfs[region] = agg_daily_df
-
-      agg_daily_df1 = agg_daily_df.copy()
-      agg_daily_df1['sum'] = agg_daily_df1.iloc[:, 3:].sum(axis=1)
-      agg_daily_percs_df = agg_daily_df1.iloc[:, 3:].divide(agg_daily_df1['sum'], axis='index').drop(columns=['sum'])
-      agg_daily_percs_df['date_id'] = agg_daily_df1.iloc[:, 0]
-      agg_daily_percs_df['region'] = region
-      agg_daily_percs_dfs[region] = agg_daily_percs_df
-
-      agg_monthly_df = group_df.resample('M').sum().reset_index()  # Resample by day and calculate the sum
-      agg_monthly_df['region'] = region
-      agg_monthly_dfs[region] = agg_monthly_df
-
-      agg_hourly_df = group_df.resample('60min').sum().reset_index()  # Resample by hourly and calculate the sum
-      agg_hourly_df['region'] = region
-      agg_hourly_dfs[region] = agg_hourly_df
-      
-  # Combine the resampled dataFrames into a single dataFrame
-  return {
-     'daily': pd.concat(agg_daily_dfs, axis=0).to_json(orient='records'), 
-     'monthly':  pd.concat(agg_monthly_dfs, axis=0).to_json(orient='records'),
-     'perc_daily': pd.concat(agg_daily_percs_dfs, axis=0).to_json(orient='records'), 
+                # Add all energy values for this timestamp
+                for energy_type in region_data.keys():
+                    # Skip excluded energy types
+                    if energy_type in excluded_energy_types:
+                        continue
+                    
+                    # Make sure energy data is a list
+                    if not isinstance(region_data[energy_type], list):
+                        #print(f"Error: region_data['{energy_type}'] is not a list, it's a {type(region_data[energy_type])}")
+                        continue
+                        
+                    # Make sure we don't go out of bounds
+                    if idx < len(region_data[energy_type]):
+                        entry[energy_type] = region_data[energy_type][idx] / 1000
+                
+                transformed_data.append(entry)
+        
+        return transformed_data
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return []
+    
+def categorize_energy_sources():
+    """
+    Define energy source categorization
+    """
+    return {
+        'renewable': [
+          "hydropower",
+          "geothermal",
+          "bioenergy",
+          "solar",
+          "wind",
+          "pumping_up",
+          "pumping_down",
+          "battery_charge",
+          "battery_generate"
+        ],
+        'non_renewable': [
+          "nuclear",
+          "thermal_lng",
+          "thermal_coal",
+          "thermal_oil",
+          "thermal_others",
+          "others"
+        ]
     }
 
-def categorize_value(value):
-  renewables = ['Wind onshore', 'Natural Gas', 'Biomass', 'Wind offshore', 'Nuclear', 'Solar', 'Run-of-River Hydro', 'Pumped storage generation', 'Other renewables', 'Dam Hydro', 'Geothermal']
-  non_renewables = ['Lignite', 'Hard Coal', 'Other fossil fuel', 'Oil']
-  if value in renewables:
-      return 'renewable'
-  elif value in non_renewables:
-      return 'non-renewable'
-  else:
-      return 'uncategorized'
+def transform_to_categories(data):
+    """
+    Transform data by categorizing into renewable and non-renewable
+    """
+    # Convert to DataFrame for easier processing
+    df = pd.DataFrame(data)
+    
+    # Get category for each energy source
+    categories = categorize_energy_sources()
+    
+    # Initialize renewable and non-renewable columns
+    df['renewable'] = 0
+    df['non_renewable'] = 0
+    
+    # Sum values by category
+    for energy_type in df.columns:
+        if energy_type in categories['renewable']:
+            # Add the values to the renewable category, handling NaN
+            df['renewable'] += df[energy_type].fillna(0)
+        elif energy_type in categories['non_renewable']:
+            # Add the values to the non-renewable category, handling NaN
+            df['non_renewable'] += df[energy_type].fillna(0)
+  
+    return df
+
+def aggregate_by_month(df):
+    """
+    Aggregate data by month.
+    Filters out incomplete months only if multiple months are present.
+    Returns DataFrame with format:
+    {date_id: datetime object, type: 'renewable'/'non_renewable', value: total}
+    """
+    # Convert date to datetime if it's not already
+    if not pd.api.types.is_datetime64_dtype(df['date']):
+        df['date'] = pd.to_datetime(df['date'])
+    
+    # Create a month column by truncating to first day of month
+    df['month'] = df['date'].dt.to_period('M').dt.to_timestamp()
+    
+    # Count unique months in the dataset
+    unique_months = df['month'].unique()
+    num_months = len(unique_months)
+    
+    # Only filter incomplete months if there's more than one month
+    if num_months > 1:
+        # Count days per month and region
+        days_per_month = df.groupby(['month', 'region'])['date'].apply(
+            lambda x: len(x.dt.date.unique())
+        ).reset_index(name='day_count')
+        
+        # Determine the expected number of days for each month
+        def expected_days(month_timestamp):
+            year = month_timestamp.year
+            month = month_timestamp.month
+            import calendar
+            return calendar.monthrange(year, month)[1]
+        
+        days_per_month['expected_days'] = days_per_month['month'].apply(expected_days)
+        days_per_month['completeness'] = days_per_month['day_count'] / days_per_month['expected_days']
+        
+        # Filter for complete months
+        complete_months = days_per_month[days_per_month['completeness'] == 1]
+        complete_month_regions = list(zip(complete_months['month'], complete_months['region']))
+        
+        # Filter the dataframe to only include complete months
+        df_filtered = df[df.apply(lambda row: (row['month'], row['region']) in complete_month_regions, axis=1)]
+        
+        # Use filtered data only if we still have data left
+        if not df_filtered.empty:
+            df = df_filtered
+    
+    # Group by month and region
+    monthly = df.groupby(['month', 'region']).agg({
+        'renewable': 'sum',
+        'non_renewable': 'sum'
+    }).reset_index()
+    
+    # Reshape using melt
+    monthly_melted = pd.melt(
+        monthly, 
+        id_vars=['month', 'region'],
+        value_vars=['renewable', 'non_renewable'],
+        var_name='type',
+        value_name='value'
+    )
+    
+    # Rename month column to date_id
+    monthly_melted = monthly_melted.rename(columns={'month': 'date_id'})
+    
+    return monthly_melted
+  
+# New function to handle different aggregation levels
+def aggregate_data_by_level(df, aggregation):
+    print(aggregation)
+    """
+    Aggregate data based on the specified level: hourly, daily, weekly, or monthly
+    """
+    # Make a copy to avoid modifying the original
+    df_copy = df.copy()
+    
+    # Define energy sources to aggregate (excluding metadata columns)
+    exclude_cols = ['date', 'region']
+    energy_cols = [col for col in df_copy.columns if col not in exclude_cols]
+    
+    # Apply appropriate time-based aggregation
+    if aggregation == 'hourly':
+        # No aggregation needed, already at hourly level
+        return df_copy
+    
+    elif aggregation == 'daily':
+        # Truncate to day
+        df_copy['date_group'] = df_copy['date'].dt.floor('D')
+        
+    elif aggregation == 'weekly':
+        # Truncate to week start (Monday)
+        df_copy['date_group'] = df_copy['date'].dt.to_period('W').dt.start_time
+        
+    elif aggregation == 'monthly':
+        # Truncate to month start
+        df_copy['date_group'] = df_copy['date'].dt.to_period('M').dt.start_time
+    
+    else:
+        # Default to hourly if invalid aggregation level
+        print(f"Warning: Unknown aggregation level '{aggregation}', defaulting to hourly")
+        return df_copy
+    
+    # Group by the truncated date and region, summing all energy values
+    grouped = df_copy.groupby(['date_group', 'region'])[energy_cols].sum().reset_index()
+    
+    # Rename date_group back to date for consistency
+    grouped.rename(columns={'date_group': 'date'}, inplace=True)
+    
+    print(f"Aggregated data to {aggregation} level: {len(df_copy)} → {len(grouped)} records")
+    
+    return grouped
 
 @app.route('/')
 def root():
@@ -103,39 +238,104 @@ def root():
 def assets(path):
     return send_from_directory('../client/dist', path)
 
-@app.route('/data', methods=['GET'])
-def get_data():
-    from_date = request.args.get('from')
-    to_date = request.args.get('to')
-    parameters = {
-        "from": from_date if from_date else "2022-10-01", 
-        "to": to_date if to_date else "2022-12-31",
-        "dataset": "task_generation_h"
-    }
-    response = requests.get("https://api.agora-energy.org/publicdata/api?", headers={"api-key" : API_KEY}, params=parameters)
+# Update the get_energy_data route in your Flask app
+@app.route('/api/data', methods=['GET'])
+def get_energy_data():
+    try:
+        # Get query parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        region = request.args.get('region')
+        aggregation = request.args.get('aggregation', 'hourly')  # Default to hourly if not specified
+        
+        print(f"Received parameters: start_date={start_date}, end_date={end_date}, region={region}, aggregation={aggregation}")
+        
+        # Convert dates to datetime objects for comparison
+        start_date_dt = pd.to_datetime(start_date) if start_date else None
+        end_date_dt = pd.to_datetime(end_date) if end_date else None
+        
+        # Determine which files to load based on date ranges
+        files_to_load = []
 
-    if response.status_code == 200:
-      print("Request successful")
-      response_json = json.loads(response.text)
-      df = pd.DataFrame(response_json['data'], columns=response_json['columns'])
-      df['value_Gwh'] = df['value'] / 1000 # change MwH to GwH
-      df['category'] = df['generation'].apply(categorize_value) # categorize fuel sources into renewables and non-renewables
+        # Add 2022 file if start_date is in 2022 or if no start_date specified
+        if not start_date_dt or start_date_dt.year <= 2022:
+            files_to_load.append('./data/2022/power-data.json')
 
-      pivot_df = df.pivot(index=['date_id', 'region'], columns='generation', values='value_Gwh')
-      pivot_df.reset_index(inplace=True) # reset the index to make 'date_id' the index 
-      df_processed = fix_outliers_missing_values(pivot_df)
-      data_json = aggregate_by(df_processed)
+        # Add 2023 file if start_date is in 2023 or if no start_date specified
+        if not start_date_dt or start_date_dt.year <= 2023:
+            files_to_load.append('./data/2023/power-data.json')
+            
+        # Add 2024 file if end_date is in 2024 or if no end_date specified
+        if not end_date_dt or end_date_dt.year >= 2024:
+            files_to_load.append('./data/2024/power-data.json')
+        
+        print(f"Loading data from files: {files_to_load}")
+        
+        # Load and combine data from all required files
+        all_data = []
+        for file_path in files_to_load:
+            try:
+                file_data = parse_energy_json(file_path)
+                if file_data:
+                    all_data.extend(file_data)
+                    print(f"Loaded {len(file_data)} records from {file_path}")
+                else:
+                    print(f"No data found in {file_path}")
+            except Exception as e:
+                print(f"Error loading {file_path}: {e}")
+        
+        if not all_data:
+            return jsonify({'error': 'Failed to load data from any file'}), 500
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(all_data)
+        df['date'] = pd.to_datetime(df['date'])
+        print(f"Combined DataFrame size before filtering: {len(df)}")
+        
+        # Apply filters
+        if start_date_dt:
+            df = df[df['date'] >= start_date_dt]
+            print(f"DataFrame size after start_date filter: {len(df)}")
+        
+        if end_date_dt:
+            df = df[df['date'] < end_date_dt]
+            print(f"DataFrame size after end_date filter: {len(df)}")
+        
+        if region:
+            print(f"Filtering by region: {region}")
+            df = df[df['region'] == region]
+            print(f"DataFrame size after region filter: {len(df)}")
 
-      pivot_df_cat = df.pivot_table(index=['date_id', 'region'], columns='category', values='value_Gwh', aggfunc='sum')
-      pivot_df_cat.reset_index(inplace=True) # reset the index to make 'date_id' the index 
-      df_processed_cat = fix_outliers_missing_values(pivot_df_cat)
-      data_json_cat = aggregate_by(df_processed_cat)
+        # Check if we have any data left after filtering
+        if len(df) == 0:
+            print("WARNING: No data left after filtering!")
+            return jsonify({
+                'type': {'daily': '[]'},
+                'categorized': {'monthly': []}
+            })
 
-      return {"type": data_json, "categorized": data_json_cat}
-    else:
-      # handle errors here
-      print("Request failed with status code:", response.status_code)
-      return {'data': []}
+
+        # Apply aggregation based on the requested level
+        df_aggregated = aggregate_data_by_level(df, aggregation)
+        print(start_date_dt, end_date_dt, df.tail(5), df_aggregated)
+        
+        # Continue with transformations for categorized data
+        cat_df = transform_to_categories(df)
+        monthly_data = aggregate_by_month(cat_df)
+        
+        return jsonify({
+            'type': {
+                'daily': df_aggregated.to_json(orient='records', date_format='iso')
+            },
+            'categorized': {
+                'monthly': monthly_data.to_json(orient='records', date_format='iso')
+            }
+        })
+            
+    except Exception as e:
+        print(f"Error in API: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
