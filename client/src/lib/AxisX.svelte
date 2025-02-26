@@ -46,22 +46,7 @@
           return timeDay.every(Math.max(1, Math.floor(domainSpanDays / idealTickCount))).range(domain[0], domain[1]);
         }
       } else if (interval === 'daily') {
-        // For few days, always show all days
-        if (domainSpanDays <= 4) {
-          const allDays = [];
-          let currentDate = new Date(domain[0]);
-          
-          // Reset to midnight to ensure consistency
-          currentDate.setHours(0, 0, 0, 0);
-          
-          // Add each day including the end day
-          while (currentDate <= domain[1]) {
-            allDays.push(new Date(currentDate));
-            currentDate.setDate(currentDate.getDate() + 1);
-          }
-          
-          return allDays;
-        } else if (domainSpanDays <= 30) {
+        if (domainSpanDays <= 30) {
           // For shorter periods, use more daily ticks
           const dayInterval = Math.max(1, Math.floor(domainSpanDays / idealTickCount));
           const ticks = timeDay.every(dayInterval).range(domain[0], domain[1]);
@@ -89,32 +74,7 @@
         // Calculate weeks between start and end dates
         const weeksSpan = Math.ceil(domainSpanDays / 7);
         
-        // For 4 or fewer weeks, always show all weeks
-        if (weeksSpan <= 4) {
-          const allWeeks = [];
-          let currentDate = new Date(domain[0]);
-          
-          // Set to start of week to ensure consistency
-          const dayOfWeek = currentDate.getDay();
-          currentDate.setDate(currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // Start on Monday
-          
-          // Add each week including the end week
-          while (currentDate <= domain[1]) {
-            allWeeks.push(new Date(currentDate));
-            currentDate.setDate(currentDate.getDate() + 7);
-          }
-          
-          // Ensure the last week is included if it's not already
-          const daysSinceLastTick = (domain[1] - allWeeks[allWeeks.length-1]) / (1000 * 60 * 60 * 24);
-          if (daysSinceLastTick > 3.5 && daysSinceLastTick < 7) {
-            // Add the last week if we're more than halfway through it
-            const lastWeekStart = new Date(allWeeks[allWeeks.length-1]);
-            lastWeekStart.setDate(lastWeekStart.getDate() + 7);
-            allWeeks.push(lastWeekStart);
-          }
-          
-          return allWeeks;
-        } else if (domainSpanDays <= 120) {
+        if (domainSpanDays <= 120) {
           // For shorter periods, use more weekly ticks
           const weekInterval = Math.max(1, Math.floor(weeksSpan / idealTickCount));
           const ticks = timeWeek.every(weekInterval).range(domain[0], domain[1]);
@@ -143,8 +103,8 @@
           (domain[1].getFullYear() - domain[0].getFullYear()) * 12 + 
           (domain[1].getMonth() - domain[0].getMonth());
         
-        // For 4 or fewer months, always show all months
-        if (monthsSpan <= 4) {
+        // For 5 or fewer months, always show all months
+        if (monthsSpan <= 5) {
           // Special case for few months - ensure all months are shown
           const allMonths = [];
           let currentDate = new Date(domain[0]);

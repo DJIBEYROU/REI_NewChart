@@ -7,11 +7,9 @@
   import { timeFormat } from 'd3-time-format';
   import { extent } from 'd3-array';
 
-  // Props
-  export let fullDateRange = []; // The full date range for your data
   export let startDate = null;   // Initial start date
   export let endDate = null;     // Initial end date
-  export let height = 80;        // Height of the timeslider
+  export let height = 60;        // Height of the timeslider
   export let margin = { top: 10, right: 40, bottom: 30, left: 40 };
 
   // Event dispatcher
@@ -36,24 +34,22 @@
   });
 
   function initializeSlider() {
-    if (!fullDateRange || fullDateRange.length === 0) return;
-    
     // Get dimensions
     width = container.clientWidth - margin.left - margin.right;
     
-    // Parse the dates if they're strings
-    const dateRange = fullDateRange.map(d => 
-      d instanceof Date ? d : new Date(d)
-    );
-    
-    // Ensure we have the minimum and maximum dates in our domain
+    // Set up the full date range for the slider
     const minDate = new Date('2022-01-01');
-    const maxDate = new Date('2024-09-31');
+    const maxDate = new Date('2024-12-31');
     
-    // Ensure dateRange includes our fixed boundaries
-    if (dateRange[0] > minDate) dateRange.unshift(minDate);
-    if (dateRange[dateRange.length - 1] < maxDate) dateRange.push(maxDate);
+    // Create an array of dates between min and max (e.g., monthly increments)
+    const dateRange = [];
+    let currentDate = new Date(minDate);
     
+    while (currentDate <= maxDate) {
+      dateRange.push(new Date(currentDate));
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
     // Set initial values if not provided
     if (!startDate) startDate = '2022-01-01';
     if (!endDate) endDate = '2024-09-31';

@@ -7,7 +7,9 @@ export const renewables = [
   "pumping_up",
   "pumping_down",
   "battery_charge",
-  "battery_generate"
+  "battery_generate",
+  "solar_curtailment",
+  "wind_curtailment"
 ];
 
 export const non_renewables = [
@@ -19,6 +21,8 @@ export const non_renewables = [
   "thermal_others",
   "others"
 ];
+
+export const misc = ["demand", "spot_price"]
 
 export const colors = {
   hydropower: 'blue',         // Blue
@@ -36,5 +40,64 @@ export const colors = {
   thermal_oil: '#996633',     // Brown
   thermal_others: '#FFA500',  // Orange
   thermal: '#FFA500',  // Orange
-  others: "#36454F"
+  others: "#36454F",
+  demand: "#000",
+  spot_price: 'purple',
+  solar_curtailment: 'yellow',
+  wind_curtailment: '#40E0D0'
+};
+
+export const translations = {
+  en: {
+    // Legend items
+    hydropower: 'Hydropower',
+    geothermal: 'Geothermal',
+    bioenergy: 'Bioenergy',
+    solar: 'Solar',
+    wind: 'Wind',
+    pumping_up: 'Pumping Up',
+    pumping_down: 'Pumping Down',
+    battery_charge: 'Battery Charge',
+    battery_generate: 'Battery Generate',
+    nuclear: 'Nuclear',
+    thermal_lng: 'LNG',
+    thermal_coal: 'Coal',
+    thermal_oil: 'Oil',
+    thermal_others: 'Thermal Others',
+    thermal: 'Thermal',
+    others: 'Others',
+    demand: 'Demand',
+    spot_price: 'JEPX System Price',
+    solar_curtailment: 'Solar Curtailment',
+    wind_curtailment: 'Wind Curtailment',
+    // Y-axis labels
+    powerGeneration: 'Power Generation (GW)',
+    systemPrice: 'JEPX System Price (JPY/kWh)'
+  },
+  jp: {
+    // Legend items based on your image
+    hydropower: '揚水(発力)',
+    geothermal: '地熱',
+    bioenergy: 'バイオエネルギー',
+    solar: '太陽光',
+    wind: '風力',
+    pumping_up: '揚水(揚水)',
+    pumping_down: '揚水(発電)',
+    battery_charge: '蓄電池(充電)',
+    battery_generate: '蓄電池(放電)',
+    nuclear: '原子力',
+    thermal_lng: 'LNG',
+    thermal_coal: '石炭',
+    thermal_oil: '石油',
+    thermal_others: '火力その他',
+    thermal: '火力',
+    others: 'その他',
+    demand: '需要',
+    spot_price: 'JEPXシステムプライス',
+    solar_curtailment: '太陽光(出力制御)',
+    wind_curtailment: '風力(出力制御)',
+    // Y-axis labels
+    powerGeneration: '発電量 (GW)',
+    systemPrice: 'JEPXシステムプライス (円/kWh)'
+  }
 };

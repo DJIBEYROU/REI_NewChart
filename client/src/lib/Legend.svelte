@@ -16,15 +16,32 @@
     align-items: center;
     margin-bottom: 6px;
     margin-left: 20px;
-    font-size: 0.9em;
-    min-width: 200px;
+    font-size: 0.85em;
+    min-width: 130px;
+    cursor: pointer;
   }
 
-  .color-circle {
+  /* Base styles for color indicators */
+  .color-indicator {
     width: 14px;
     height: 14px;
-    border-radius: 50%;
     margin-right: 8px;
+  }
+
+  /* Circle shape */
+  .shape-circle {
+    border-radius: 50%;
+  }
+
+  /* Rectangle shape */
+  .shape-rect {
+    border-radius: 0;
+    height: 7px;
+  }
+  
+  /* Special style for when an item is clicked/selected */
+  .selected {
+    font-weight: bold;
   }
 </style>
 
@@ -32,20 +49,22 @@
   <h3 style="margin: 5px 20px;">{title}</h3>
 {/if}
 <div class='legend-container'>
-  {#each legendData as { color, text }}
+  {#each legendData as { color, text, shape = 'circle' }}
     <div 
-      class="legend-item"
-      cursor='pointer'
+      class="legend-item {clicked === text ? 'selected' : ''}"
       on:click={(event) => {
         event.stopImmediatePropagation();
-        clicked = text
+        clicked = text;
       }}
       on:dblclick={(event) => {
         event.stopImmediatePropagation();
-        clicked = null
+        clicked = null;
       }}
     >
-      <div class="color-circle" style="background-color: {color}"></div>
+      <div 
+        class="color-indicator {shape === 'circle' ? 'shape-circle' : 'shape-rect'}" 
+        style="background-color: {color}"
+      ></div>
       <span>{text}</span>
     </div>
   {/each}

@@ -7,7 +7,8 @@
   import AxisY from './AxisY.svelte'
 
   export let data
-
+  export let currentLang = 'en';
+  
   const margin = { top: 40, right: 60, bottom: 30, left: 60 };
   let div
   let width = 200
@@ -69,7 +70,7 @@
         width={innerWidth} 
         {yScale} 
         ticks={yScale.ticks(6)}
-        title='Power Generation Value (in GWh)'
+        title={currentLang === 'en' ? 'Power Generation (GW)' : '発電量 (GW)'}
       />
       {#each lineData as d}
         <path
