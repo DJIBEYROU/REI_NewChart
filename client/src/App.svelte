@@ -4,7 +4,7 @@
   import LineChart from './lib/LineChart.svelte';
   import TimeSlider from './lib/TimeSlider.svelte';
   import Legend from "./lib/Legend.svelte";
-  import { renewables, non_renewables, colors, misc, translations } from './lib/consts.js'
+  import { renewables, non_renewables, colors, misc, translations, regions } from './lib/consts.js'
   import { writable } from 'svelte/store';
 
   // Create a store for the current language
@@ -12,7 +12,6 @@
 
   let dailyData = []
   let monthlyData = []
-  let regions = ['japan', 'tokyo', 'hokkaido', 'tohuku', 'chubu', 'hokuriku', 'kansai', 'chugoku', 'shikoku', 'kyushu'];
   let selectedRegion = 'japan';
   let startDate = '2024-04-01';
   let endDate = '2024-04-15';
@@ -166,7 +165,13 @@
 <main>
   {#if monthlyData.length > 0}
   <div class='header'>
-    <div class='title' style="margin-left: 20px;">
+    <div class='dropdown'>
+      <select value={selectedRegion} on:change={handleOptionChange}>
+        {#each regions as option}
+        <option value={option}>{getTranslation(option, currentLang)}</option>
+        {/each}
+      </select>
+      <span class="caret"></span>
     </div>
     <div class='panel'>
       <div class="language-toggle">
@@ -187,14 +192,7 @@
           Download CSV
         </button>
       </div>
-      <div class='dropdown'>
-        <select value={selectedRegion} on:change={handleOptionChange}>
-          {#each regions as option}
-          <option value={option}>{option}</option>
-          {/each}
-        </select>
-        <span class="caret"></span>
-      </div>
+
     </div>
   </div>
 

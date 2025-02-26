@@ -189,9 +189,9 @@ def aggregate_by_month(df):
   
 # New function to handle different aggregation levels
 def aggregate_data_by_level(df, aggregation):
-    print(aggregation)
     """
     Aggregate data based on the specified level: hourly, daily, weekly, or monthly
+    With spot_price averaged instead of summed
     """
     # Make a copy to avoid modifying the original
     df_copy = df.copy()
@@ -199,6 +199,9 @@ def aggregate_data_by_level(df, aggregation):
     # Define energy sources to aggregate (excluding metadata columns)
     exclude_cols = ['date', 'region']
     energy_cols = [col for col in df_copy.columns if col not in exclude_cols]
+    
+    # Separate spot_price from other energy columns
+    sum_cols = [col for col in energy_cols if col != 'spot_price']
     
     # Apply appropriate time-based aggregation
     if aggregation == 'hourly':
@@ -222,8 +225,15 @@ def aggregate_data_by_level(df, aggregation):
         print(f"Warning: Unknown aggregation level '{aggregation}', defaulting to hourly")
         return df_copy
     
-    # Group by the truncated date and region, summing all energy values
-    grouped = df_copy.groupby(['date_group', 'region'])[energy_cols].sum().reset_index()
+    # Create a dictionary of aggregation functions for each column
+    agg_dict = {col: 'sum' for col in sum_cols}
+    
+    # Add average for spot_price if it exists in the dataframe
+    if 'spot_price' in df_copy.columns:
+        agg_dict['spot_price'] = 'mean'
+    
+    # Group by the truncated date and region, applying different aggregations
+    grouped = df_copy.groupby(['date_group', 'region']).agg(agg_dict).reset_index()
     
     # Rename date_group back to date for consistency
     grouped.rename(columns={'date_group': 'date'}, inplace=True)

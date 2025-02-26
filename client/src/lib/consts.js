@@ -72,7 +72,18 @@ export const translations = {
     wind_curtailment: 'Wind Curtailment',
     // Y-axis labels
     powerGeneration: 'Power Generation (GW)',
-    systemPrice: 'JEPX System Price (JPY/kWh)'
+    systemPrice: 'JEPX System Price (JPY/kWh)',
+    // Regions
+    japan: 'Japan',
+    tokyo: 'Tokyo',
+    hokkaido: 'Hokkaido',
+    tohuku: 'Tohoku',
+    chubu: 'Chubu',
+    hokuriku: 'Hokuriku',
+    kansai: 'Kansai',
+    chugoku: 'Chugoku',
+    shikoku: 'Shikoku',
+    kyushu: 'Kyushu'
   },
   jp: {
     // Legend items based on your image
@@ -98,6 +109,19 @@ export const translations = {
     wind_curtailment: '風力(出力制御)',
     // Y-axis labels
     powerGeneration: '発電量 (GW)',
-    systemPrice: 'JEPXシステムプライス (円/kWh)'
+    systemPrice: 'JEPXシステムプライス (円/kWh)',
+    // Regions
+    japan: '全国',
+    tokyo: '東京',
+    hokkaido: '北海道',
+    tohuku: '東北',
+    chubu: '中部',
+    hokuriku: '北陸',
+    kansai: '関西',
+    chugoku: '中国',
+    shikoku: '四国',
+    kyushu: '九州'
   }
 };
+
+export const regions = ['japan', 'tokyo', 'hokkaido', 'tohuku', 'chubu', 'hokuriku', 'kansai', 'chugoku', 'shikoku', 'kyushu'];

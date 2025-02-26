@@ -6,7 +6,8 @@
   export let showDemand = false;
   export let showSpotPrice = false;
   export let aggregationLevel = 'hourly';
-
+  export let currentLang = 'en';
+  import { translations } from './consts.js'
   import { fly, fade } from "svelte/transition";
 
   let tooltipWidth, rows;
@@ -26,7 +27,6 @@
   $: formattedDate = formatDate(data.date, aggregationLevel);
 
   function formatDate(dateStr, level) {
-    console.log('aggregation', level)
     const date = new Date(dateStr);
     
     // Function to get ordinal suffix (1st, 2nd, 3rd, etc.)
@@ -83,6 +83,11 @@
       (!showSpotPrice || d !== 'spot_price')
     );
   }
+
+  // Helper function to get translation
+  function getTranslation(key, lang) {
+    return translations[lang][key] || key;
+  }
 </script>
 
 <div
@@ -100,7 +105,7 @@
   {#each rows as row}
   <div class='info'>
     <span class="key" style="background: {colorScale(row)}">
-      {row}
+      {getTranslation(row, currentLang)}
     </span> 
     <span>
       {typeof data[row] === 'number' ? data[row].toFixed(2) : data[row]}
@@ -113,7 +118,7 @@
   <div class="separator"></div>
   <div class='info special-row'>
     <span class="key demand-key">
-      Demand
+      {getTranslation('demand', currentLang)}
     </span> 
     <span>
       {typeof data.demand === 'number' ? data.demand.toFixed(2) : data.demand}
@@ -126,7 +131,7 @@
   <div class="separator"></div>
   <div class='info special-row'>
     <span class="key spot_price-key">
-      Spot Price
+      {getTranslation('systemPrice', currentLang)}
     </span> 
     <span>
       {typeof data['spot_price'] === 'number' ? data['spot_price'].toFixed(2) : data['spot_price']} ¥/kWh

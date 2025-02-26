@@ -386,6 +386,7 @@
       showDemand={true}
       showSpotPrice={true}
       aggregationLevel={aggregationLevel}
+      currentLang={currentLang}
     />
   {/if}
 </div>
