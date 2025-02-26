@@ -43,7 +43,7 @@ def parse_energy_json(file_path):
                 }
                 
                 # Define energy types to exclude
-                excluded_energy_types = ['regional_in', 'regional_out', 'spot_price', 'demand', 'solar_curtailment', 'wind_curtailment']
+                excluded_energy_types = ['regional_in', 'regional_out']
 
                 # Add all energy values for this timestamp
                 for energy_type in region_data.keys():
@@ -58,7 +58,10 @@ def parse_energy_json(file_path):
                         
                     # Make sure we don't go out of bounds
                     if idx < len(region_data[energy_type]):
-                        entry[energy_type] = region_data[energy_type][idx] / 1000
+                        if (energy_type == 'spot_price'):
+                          entry[energy_type] = region_data[energy_type][idx]
+                        else:
+                          entry[energy_type] = region_data[energy_type][idx] / 1000
                 
                 transformed_data.append(entry)
         
@@ -317,7 +320,7 @@ def get_energy_data():
 
         # Apply aggregation based on the requested level
         df_aggregated = aggregate_data_by_level(df, aggregation)
-        print(start_date_dt, end_date_dt, df.tail(5), df_aggregated)
+        #print(start_date_dt, end_date_dt, df.tail(5), df_aggregated)
         
         # Continue with transformations for categorized data
         cat_df = transform_to_categories(df)
