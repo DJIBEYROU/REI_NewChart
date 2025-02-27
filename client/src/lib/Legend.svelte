@@ -49,12 +49,12 @@
   <h3 style="margin: 5px 20px;">{title}</h3>
 {/if}
 <div class='legend-container'>
-  {#each legendData as { color, text, shape = 'circle' }}
+  {#each legendData as { color, key, text, shape = 'circle' }}
     <div 
-      class="legend-item {clicked === text ? 'selected' : ''}"
+      class="legend-item {clicked === key ? 'selected' : ''}"
       on:click={(event) => {
         event.stopImmediatePropagation();
-        clicked = text;
+        clicked = key;
       }}
       on:dblclick={(event) => {
         event.stopImmediatePropagation();

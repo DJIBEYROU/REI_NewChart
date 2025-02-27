@@ -8,7 +8,7 @@
   import { writable } from 'svelte/store';
 
   // Create a store for the current language
-  export const currentLanguage = writable('en'); // Default to English
+  export const currentLanguage = writable('jp'); // Default to English
 
   let dailyData = []
   let monthlyData = []
@@ -18,11 +18,6 @@
   let aggregationLevel = 'hourly'; // Default aggregation for full date range
   let allDates = []; // Store all dates for reuse
   let clickedItem; // Clicked item on legend
-
-  // Helper function to get translation
-  function getTranslation(key, lang) {
-    return translations[lang][key] || key;
-  }
 
   // Add these variables to your existing variables
   let currentLang;
@@ -35,7 +30,7 @@
     return {
       color: value,
       shape: (key === 'demand' || key === 'spot_price') ? 'rect' : 'circle',
-      text: getTranslation(key, currentLang),
+      text: translations[currentLang][key] || key,
       key: key // Keep original key for filtering
     };
   });
@@ -168,7 +163,7 @@
     <div class='dropdown'>
       <select value={selectedRegion} on:change={handleOptionChange}>
         {#each regions as option}
-        <option value={option}>{getTranslation(option, currentLang)}</option>
+        <option value={option}>{translations[currentLang][option] || option}</option>
         {/each}
       </select>
       <span class="caret"></span>

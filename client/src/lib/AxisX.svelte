@@ -1,5 +1,5 @@
 <script>
-    import { timeMonth, timeWeek, timeDay, timeHour } from 'd3-time';
+    import { timeMonth, timeWeek, timeDay, timeHour, timeInterval } from 'd3-time';
     
     export let height;
     export let xScale;
@@ -8,19 +8,17 @@
     export let customTicks = null; // Allow custom ticks to be passed in
     
     const TICK_LENGTH = 4;
-    const IDEAL_TICK_SPACING = width < 300 ? 80 : 50; // Target pixels between ticks
+    const IDEAL_TICK_SPACING = 80; // Target pixels between ticks
   
     // Generate appropriate ticks based on interval, domain range, and chart width
-    $: ticks = customTicks || getTicks(xScale, interval, width);
+    $: ticks = customTicks || getTicks(xScale, timeInterval);
     
     // For debugging: log the number of ticks generated
     $: if (ticks && ticks.length > 0) {
       console.log(`Generated ${ticks.length} ticks for interval: ${interval}, width: ${width}px`);
     }
     
-    function getTicks(scale, interval, width) {
-      if (!width || width <= 0) return [];
-      
+    function getTicks(scale, interval) {      
       const domain = scale.domain();
       const range = scale.range();
       const rangeWidth = range[1] - range[0];
@@ -32,8 +30,7 @@
       const domainSpanMs = domain[1] - domain[0];
       const domainSpanDays = domainSpanMs / (1000 * 60 * 60 * 24);
       
-      // Determine the appropriate time interval based on both the interval parameter 
-      // and the domain span
+      // Determine the appropriate time interval based on both the interval parameter and the domain span
       if (interval === 'hourly') {
         if (domainSpanDays <= 2) {
           // For 1-2 days, show hours more frequently
@@ -50,18 +47,7 @@
           // For shorter periods, use more daily ticks
           const dayInterval = Math.max(1, Math.floor(domainSpanDays / idealTickCount));
           const ticks = timeDay.every(dayInterval).range(domain[0], domain[1]);
-          
-          // Check if we need to add the last day
-          const lastTick = ticks[ticks.length - 1];
-          const hoursSinceLastTick = (domain[1] - lastTick) / (1000 * 60 * 60);
-          
-          if (hoursSinceLastTick > 12 && hoursSinceLastTick < 24) {
-            // Add the last day if we're more than halfway through it
-            const lastDay = new Date(lastTick);
-            lastDay.setDate(lastDay.getDate() + 1);
-            ticks.push(lastDay);
-          }
-          
+
           return ticks;
         } else if (domainSpanDays <= 90) {
           // For medium periods, use weekly ticks but more frequently
@@ -78,20 +64,7 @@
           // For shorter periods, use more weekly ticks
           const weekInterval = Math.max(1, Math.floor(weeksSpan / idealTickCount));
           const ticks = timeWeek.every(weekInterval).range(domain[0], domain[1]);
-          
-          // Check if we need to add the last week
-          if (ticks.length > 0) {
-            const lastTick = ticks[ticks.length - 1];
-            const daysSinceLastTick = (domain[1] - lastTick) / (1000 * 60 * 60 * 24);
-            
-            if (daysSinceLastTick > 3.5 && daysSinceLastTick < 7) {
-              // Add the last week if we're more than halfway through it
-              const lastWeekStart = new Date(lastTick);
-              lastWeekStart.setDate(lastWeekStart.getDate() + 7);
-              ticks.push(lastWeekStart);
-            }
-          }
-          
+
           return ticks;
         } else {
           // For longer periods, use more monthly ticks
@@ -103,52 +76,10 @@
           (domain[1].getFullYear() - domain[0].getFullYear()) * 12 + 
           (domain[1].getMonth() - domain[0].getMonth());
         
-        // For 5 or fewer months, always show all months
-        if (monthsSpan <= 5) {
-          // Special case for few months - ensure all months are shown
-          const allMonths = [];
-          let currentDate = new Date(domain[0]);
-          
-          // Set to first day of month to ensure consistency
-          currentDate.setDate(1);
-          
-          // Add each month including the end month
-          while (currentDate <= domain[1]) {
-            allMonths.push(new Date(currentDate));
-            currentDate.setMonth(currentDate.getMonth() + 1);
-          }
-          
-          // Ensure the last month is included if it's not already
-          const lastMonth = new Date(domain[1]);
-          lastMonth.setDate(1);
-          if (allMonths.length === 0 || 
-              allMonths[allMonths.length-1].getMonth() !== lastMonth.getMonth() || 
-              allMonths[allMonths.length-1].getFullYear() !== lastMonth.getFullYear()) {
-            allMonths.push(lastMonth);
-          }
-          
-          return allMonths;
-        } else {
-          // For more months, use the calculated interval
-          const monthInterval = Math.max(1, Math.floor(monthsSpan / idealTickCount));
-          const ticks = timeMonth.every(monthInterval).range(domain[0], domain[1]);
-          
-          // Ensure the last tick is included
-          const lastTick = new Date(domain[1]);
-          lastTick.setDate(1); // First day of the last month
-          
-          // Check if last month is already included
-          const lastMonthIncluded = ticks.some(tick => 
-            tick.getMonth() === lastTick.getMonth() && 
-            tick.getFullYear() === lastTick.getFullYear()
-          );
-          
-          if (!lastMonthIncluded && domain[1].getDate() > 1) {
-            ticks.push(lastTick);
-          }
-          
-          return ticks;
-        }
+        const monthInterval = Math.max(1, Math.floor(monthsSpan / (idealTickCount/2)));
+        const ticks = timeMonth.every(monthInterval).range(domain[0], domain[1]);
+        
+        return ticks;
       }
       
       // Default fallback - let d3 decide

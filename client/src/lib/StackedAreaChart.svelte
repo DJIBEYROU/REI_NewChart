@@ -8,7 +8,7 @@
   import HoverEvents from "./HoverEvents.svelte";
   import Tooltip from "./Tooltip.svelte";
   import { fade } from "svelte/transition";
-  import { colors } from './consts.js'
+  import { colors, translations } from './consts.js'
 
   export let data, aggregationLevel, clickedItem
   export let currentLang = 'en';
@@ -285,7 +285,7 @@
         width={innerWidth} 
         {yScale} 
         ticks={yScale.ticks(8)}
-        title={currentLang === 'en' ? 'Power Generation (GW)' : '発電量 (GW)'}
+        title={translations[currentLang]['powerGeneration'] || 'powerGeneration'}
         orientation="left"
       />
       
@@ -295,7 +295,7 @@
           width={0}
           yScale={y2Scale}
           ticks={y2Scale.ticks(8)}
-          title={currentLang === 'en' ? 'JEPX System Price (JPY/kWh)' : 'JEPXシステムプライス (円/kWh)'}
+          title={translations[currentLang]['systemPrice'] || 'systemPrice'}
           orientation="right"
         />
       </g>

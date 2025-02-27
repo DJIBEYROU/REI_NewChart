@@ -5,6 +5,7 @@
   import { line } from 'd3-shape'
   import AxisX from './AxisX.svelte'
   import AxisY from './AxisY.svelte'
+  import { translations } from './consts.js'
 
   export let data
   export let currentLang = 'en';
@@ -53,8 +54,6 @@
   $: lineGenerator = line()
     .x((d, i) => xScale(new Date(d.date_id)))
     .y((d) => yScale(d.value))
-
-  $: console.log(lineData)
 </script>
 
 <div class="chart-container" bind:this={div}>
@@ -65,12 +64,13 @@
         width={innerWidth} 
         {xScale}
         interval="monthly"
+        customTicks={[data[0]['date_id'], data[data.length-1]['date_id']]}
       />
       <AxisY 
         width={innerWidth} 
         {yScale} 
         ticks={yScale.ticks(6)}
-        title={currentLang === 'en' ? 'Power Generation (GW)' : '発電量 (GW)'}
+        title={translations[currentLang]['powerGeneration'] || 'powerGeneration'}
       />
       {#each lineData as d}
         <path

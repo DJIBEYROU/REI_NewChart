@@ -52,7 +52,7 @@
     const year = date.getFullYear();
     
     // Base date format without time
-    let formattedStr = `${ordinalDay} ${month} ${year}`;
+    let formattedStr = (level === 'monthly')  ? `${month} ${year}` : `${ordinalDay} ${month} ${year}`;
     
     // Add time for hourly aggregation
     if (level === 'hourly') {
