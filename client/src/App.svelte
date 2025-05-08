@@ -47,8 +47,8 @@
         region: selectedRegion,
         aggregation: aggregationLevel,
       });
-
-      const response = await fetch(`http://localhost:3000/api/data?${params}`);
+//stackedarea-timeline-chart/server/data
+      const response = await fetch(`stackedarea-timeline-chart/server/data?${params}`);
       const result = await response.json();
       dailyData = JSON.parse(result.type.daily)
       monthlyData = JSON.parse(result.categorized.monthly)
